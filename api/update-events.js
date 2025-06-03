@@ -1,3 +1,11 @@
+import { buffer } from 'micro';
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', 'https://cvsinc.vercel.app');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -14,9 +22,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('📦 Request Body:', req.body); // <--- add this line
+    // ✅ Properly read raw request body
+    const rawBody = await buffer(req);
+    const updatedContent = JSON.parse(rawBody.toString());
 
-    const updatedContent = req.body;
     const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
 
     const getRes = await fetch(apiUrl, {
@@ -27,7 +36,7 @@ export default async function handler(req, res) {
     });
 
     const fileData = await getRes.json();
-    const currentContent = JSON.parse(Buffer.from(fileData.content, 'base64').toString('utf-8'));
+    const currentContent = JSON.parse(Buffer.from(fileData.content, 'base64').toString('utf8'));
 
     currentContent.news_events = updatedContent.news_events;
 
@@ -48,15 +57,15 @@ export default async function handler(req, res) {
     });
 
     if (!putRes.ok) {
-      const error = await putRes.json();
-      console.error('❌ GitHub Error:', error); // <--- show GitHub error
+      const error = await putRes.text();
+      console.error('❌ GitHub error:', error);
       return res.status(500).json({ success: false, error: 'GitHub update failed', detail: error });
     }
 
     return res.status(200).json({ success: true });
 
   } catch (err) {
-    console.error('❌ Server Crash:', err); // <--- show crash error
+    console.error('❌ Server crash:', err);
     return res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
