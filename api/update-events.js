@@ -1,11 +1,10 @@
 export default async function handler(req, res) {
-  // ✅ CORS headers so frontend can talk to this backend
   res.setHeader('Access-Control-Allow-Origin', 'https://cvsinc.vercel.app');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end(); // Let preflight through
+    return res.status(200).end();
   }
 
   const { GITHUB_TOKEN, REPO_OWNER, REPO_NAME, FILE_PATH } = process.env;
@@ -15,8 +14,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const updatedContent = req.body;
+    console.log('📦 Request Body:', req.body); // <--- add this line
 
+    const updatedContent = req.body;
     const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
 
     const getRes = await fetch(apiUrl, {
@@ -29,7 +29,6 @@ export default async function handler(req, res) {
     const fileData = await getRes.json();
     const currentContent = JSON.parse(Buffer.from(fileData.content, 'base64').toString('utf-8'));
 
-    // ✅ Update only the news_events section
     currentContent.news_events = updatedContent.news_events;
 
     const updatedBase64 = Buffer.from(JSON.stringify(currentContent, null, 2)).toString('base64');
@@ -48,12 +47,16 @@ export default async function handler(req, res) {
       })
     });
 
-    if (!putRes.ok) throw new Error('GitHub update failed');
+    if (!putRes.ok) {
+      const error = await putRes.json();
+      console.error('❌ GitHub Error:', error); // <--- show GitHub error
+      return res.status(500).json({ success: false, error: 'GitHub update failed', detail: error });
+    }
 
     return res.status(200).json({ success: true });
 
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
+    console.error('❌ Server Crash:', err); // <--- show crash error
+    return res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
